@@ -27,7 +27,7 @@ RESOURCES = CONTENTS / "Resources"
 TOOLS = RESOURCES / "tools"
 LIB = RESOURCES / "lib"
 MANIFEST = RESOURCES / "dependency-manifest.json"
-EXECUTABLE = CONTENTS / "MacOS" / "VideoSaver"
+EXECUTABLE = CONTENTS / "MacOS" / "Vitract"
 REVISION = 3
 
 
@@ -252,39 +252,30 @@ def package_tools():
 ICON_SWIFT = r'''
 import AppKit
 let output = CommandLine.arguments[1]
-let sizes = [16, 32, 128, 256, 512]
-for size in sizes {
+for size in [16, 32, 128, 256, 512] {
     for scale in [1, 2] {
         let pixels = size * scale
         let image = NSImage(size: NSSize(width: pixels, height: pixels))
         image.lockFocus()
         let ctx = NSGraphicsContext.current!.cgContext
         ctx.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
-        let rect = CGRect(x: 48, y: 48, width: 928, height: 928)
-        let bg = NSBezierPath(roundedRect: rect, xRadius: 220, yRadius: 220)
-        NSColor(calibratedRed: 0.97, green: 0.97, blue: 0.98, alpha: 1).setFill()
-        bg.fill()
-        let gradient = NSGradient(colors: [NSColor(calibratedRed: 1.0, green: 0.12, blue: 0.18, alpha: 1), NSColor(calibratedRed: 0.89, green: 0.02, blue: 0.08, alpha: 1)])!
-        let card = NSBezierPath(roundedRect: NSRect(x: 206, y: 322, width: 612, height: 430), xRadius: 76, yRadius: 76)
-        gradient.draw(in: card, angle: -50)
-        let play = NSBezierPath()
-        play.move(to: NSPoint(x: 434, y: 445)); play.line(to: NSPoint(x: 434, y: 638)); play.line(to: NSPoint(x: 600, y: 541)); play.close()
-        NSColor.white.setFill(); play.fill()
-        let badge = NSBezierPath(ovalIn: NSRect(x: 566, y: 126, width: 284, height: 324))
-        NSColor(calibratedRed: 0.88, green: 0.02, blue: 0.08, alpha: 1).setFill(); badge.fill()
-        let arrow = NSBezierPath()
-        arrow.lineWidth = 52; arrow.lineCapStyle = .round; arrow.lineJoinStyle = .round
-        arrow.move(to: NSPoint(x: 708, y: 410)); arrow.line(to: NSPoint(x: 708, y: 202))
-        arrow.move(to: NSPoint(x: 620, y: 282)); arrow.line(to: NSPoint(x: 708, y: 194)); arrow.line(to: NSPoint(x: 796, y: 282))
-        NSColor.white.setStroke(); arrow.stroke()
+        let bg = NSBezierPath(roundedRect: NSRect(x: 48, y: 48, width: 928, height: 928), xRadius: 220, yRadius: 220)
+        NSColor(calibratedRed: 0.035, green: 0.16, blue: 0.19, alpha: 1).setFill(); bg.fill()
+        let mark = NSBezierPath()
+        mark.lineWidth = 108; mark.lineCapStyle = .round; mark.lineJoinStyle = .round
+        mark.move(to: NSPoint(x: 270, y: 735)); mark.line(to: NSPoint(x: 490, y: 280)); mark.line(to: NSPoint(x: 760, y: 735))
+        NSColor(calibratedRed: 0.16, green: 0.88, blue: 0.76, alpha: 1).setStroke(); mark.stroke()
+        let line = NSBezierPath(); line.lineWidth = 38; line.lineCapStyle = .round
+        line.move(to: NSPoint(x: 655, y: 290)); line.line(to: NSPoint(x: 795, y: 290))
+        NSColor.white.setStroke(); line.stroke()
         image.unlockFocus()
         let bitmap = NSBitmapImageRep(data: image.tiffRepresentation!)!
         let suffix = scale == 1 ? "" : "@2x"
-        let path = "\(output)/icon_\(size)x\(size)\(suffix).png"
-        try bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: path))
+        try bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "\(output)/icon_\(size)x\(size)\(suffix).png"))
     }
 }
 '''
+
 
 
 def build_icon():
@@ -308,10 +299,12 @@ def build_app(minimum):
          "-module-cache-path", BUILD / "ModuleCache", "-framework", "SwiftUI", "-framework", "AppKit",
          *sources, "-o", EXECUTABLE], capture=False)
     shutil.copytree(ROOT / "Plugins", RESOURCES / "plugins", dirs_exist_ok=True)
+    legacy = CONTENTS / "MacOS" / "VideoSaver"
+    if legacy.exists(): legacy.unlink()
     build_icon()
-    plist = {"CFBundleExecutable": "VideoSaver", "CFBundleIdentifier": "local.clipdock.videosaver",
+    plist = {"CFBundleExecutable": "Vitract", "CFBundleIdentifier": "local.vitract.desktop",
         "CFBundleName": "Vitract", "CFBundleDisplayName": "Vitract", "CFBundlePackageType": "APPL",
-        "CFBundleShortVersionString": "1.2.0", "CFBundleVersion": "3",
+        "CFBundleShortVersionString": "1.2.1", "CFBundleVersion": "4",
         "CFBundleIconFile": "AppIcon", "LSMinimumSystemVersion": minimum,
         "LSApplicationCategoryType": "public.app-category.video", "NSHighResolutionCapable": True,
         "NSPrincipalClass": "NSApplication", "NSHumanReadableCopyright": "© 2026 Vitract. Third-party notices included."}

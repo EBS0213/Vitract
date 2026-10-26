@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 private let ink = Color(red: 0.13, green: 0.20, blue: 0.20)
-private let accent = Color(red: 0.87, green: 0.10, blue: 0.14)
+private let accent = Color(red: 0.02, green: 0.48, blue: 0.48)
 private let muted = Color(red: 0.40, green: 0.46, blue: 0.45)
 private let canvas = Color(red: 0.96, green: 0.97, blue: 0.95)
 
@@ -94,7 +94,7 @@ struct MainView: View {
         HStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 11).fill(accent).frame(width: 39, height: 39)
-                Image(systemName: "play.fill").font(.system(size: 18, weight: .bold)).foregroundStyle(.white).offset(x: 1)
+                Text("V").font(.system(size: 27, weight: .black, design: .rounded)).foregroundStyle(.white)
             }
             Text("Vitract").font(.system(size: 20, weight: .bold)).foregroundStyle(ink)
             Text("FOR MAC").font(.system(size: 9, weight: .bold)).tracking(1.4).foregroundStyle(muted).padding(.leading, 5)
@@ -157,6 +157,15 @@ struct MainView: View {
                     Text(video.uploader).font(.system(size: 12)).foregroundStyle(muted)
                 }.padding(.top, 2)
                 Spacer(minLength: 0)
+            }
+            if model.postVideoCount > 1 {
+                HStack {
+                    Text("게시물 영상 \(model.postVideoIndex)/\(model.postVideoCount)")
+                    ForEach(1...model.postVideoCount, id: \.self) { index in
+                        Button("영상 \(index)") { model.selectPostVideo(index) }
+                            .disabled(model.isBusy || index == model.postVideoIndex)
+                    }
+                }.font(.system(size: 12))
             }
             VStack(alignment: .leading, spacing: 10) {
                 HStack {

@@ -74,8 +74,14 @@ final class BackendSuite {
     }
 
     func run() async {
+        await test("Threads media route and selected video canonicalization") {
+            let base = "https://www.threads.com/@test/post/ABCdef123"
+            try expect(try canonicalVideoURL(base + "/media").absoluteString == base, "media path was not normalized")
+            try expect(try canonicalVideoURL(base + "/media?vitract_video=2").absoluteString == base + "?vitract_video=2", "selection was lost")
+        }
+
         await test("SNS post URLs accepted and unsafe URLs rejected") {
-            for url in ["https://www.instagram.com/reel/ABCdef123/?igsh=tracking", "https://x.com/test/status/123456789?s=20", "https://www.threads.net/@test/post/ABCdef123", "https://www.facebook.com/reel/123456789"] {
+            for url in ["https://www.instagram.com/reel/ABCdef123/?igsh=tracking", "https://x.com/test/status/123456789?s=20", "https://www.threads.net/@test/post/ABCdef123", "https://www.threads.com/@test/post/ABCdef123/media", "https://www.facebook.com/reel/123456789"] {
                 _ = try canonicalVideoURL(url)
             }
             for url in ["https://instagram.com.evil.test/reel/ABCdef123/", "https://x.com/test", "https://threads.com/@test", "https://user:pass@instagram.com/reel/ABCdef123/"] {

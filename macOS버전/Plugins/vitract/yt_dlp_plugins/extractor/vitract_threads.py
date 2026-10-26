@@ -12,7 +12,7 @@ import socket
 import ssl
 import time
 from html.parser import HTMLParser
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 MAX_HTML_BYTES = 2 * 1024 * 1024
 HOSTS = {'threads.com', 'www.threads.com', 'threads.net', 'www.threads.net'}
@@ -33,7 +33,7 @@ def canonical_threads_url(target_url):
             raise ValueError()
         if not ASCII_HOST.fullmatch(p.hostname) or p.netloc.lower() not in (p.hostname, p.hostname + ':443'):
             raise ValueError()
-        match = POST_PATH.fullmatch(p.path)
+        match = POST_PATH.fullmatch(re.sub(r'/media/?$', '', p.path))
         if not match: raise ValueError()
     except (ValueError, TypeError):
         raise ThreadsError('Enter a public Threads post URL.', 'threads_invalid_url') from None
@@ -96,7 +96,7 @@ class _EmbedParser(HTMLParser):
         if any('BodyTextContainer' in classes for _, classes in self.stack) and not any(tag in ('script','style') for tag, _ in self.stack):
             self.caption.append(data)
 
-def parse_threads_embed(embed_html, target_url):
+def parse_threads_embed(embed_html, target_url, video_index=1):
     """Parse already-fetched official embed HTML; convenient for offline tests."""
     url, user, code = canonical_threads_url(target_url)
     if not isinstance(embed_html, str) or len(embed_html.encode('utf-8')) > MAX_HTML_BYTES:
@@ -106,20 +106,19 @@ def parse_threads_embed(embed_html, target_url):
     except Exception as error: raise ThreadsError('Invalid Threads response.') from error
     if (user.casefold(), code) not in parser.post_links:
         raise ThreadsError('Threads post could not be verified.', 'threads_identity_mismatch')
-    if parser.carousel or parser.video_count > 1:
-        raise ThreadsError('Use a single-video Threads post.', 'threads_multiple_videos')
-    if parser.video_count != 1:
+    if parser.video_count < 1:
         raise ThreadsError('No public video found.', 'threads_no_video')
     sources = list(dict.fromkeys(_cdn_url(value, video=True) for value in parser.sources))
-    if len(sources) != 1:
-        raise ThreadsError('Use a single-video Threads post.', 'threads_multiple_videos')
+    if not sources or not 1 <= video_index <= len(sources):
+        raise ThreadsError('Selected video is unavailable.', 'threads_invalid_selection')
     title = ' '.join(''.join(parser.caption).split()).strip()[:2000] or f'@{user} · {code}'
     poster = _cdn_url(parser.poster) if parser.poster else None
     return {
-        'id': code, 'extractor_key': 'ThreadsDirect', 'extractor': 'ThreadsDirect',
-        'webpage_url': url, 'original_url': url, 'title': title,
+        'vitract_video_count': len(sources), 'vitract_video_index': video_index,
+        'id': code + '-' + str(video_index), 'extractor_key': 'ThreadsDirect', 'extractor': 'ThreadsDirect',
+        'webpage_url': url, 'original_url': url, 'title': title + (f' · 영상 {video_index}/{len(sources)}' if len(sources) > 1 else ''),
         'uploader': user, 'channel': user, 'thumbnail': poster, 'duration': 0,
-        'formats': [{'format_id': 'public-embed', 'url': sources[0], 'ext': 'mp4', 'protocol': 'https'}],
+        'formats': [{'format_id': 'public-embed', 'url': sources[video_index - 1], 'ext': 'mp4', 'protocol': 'https'}],
     }
 
 def _fetch_embed(url, timeout_seconds):
@@ -182,7 +181,9 @@ def _fetch_embed(url, timeout_seconds):
 
 def inspect_threads(target_url, timeout_seconds=30):
     url, _, _ = canonical_threads_url(target_url)
-    return parse_threads_embed(_fetch_embed(url + '/embed', timeout_seconds), url)
+    try: index = int(parse_qs(urlsplit(target_url).query).get('vitract_video', ['1'])[0])
+    except ValueError: raise ThreadsError('Invalid video selection.')
+    return parse_threads_embed(_fetch_embed(url + '/embed', timeout_seconds), url, index)
 
 
 from yt_dlp.extractor.common import InfoExtractor

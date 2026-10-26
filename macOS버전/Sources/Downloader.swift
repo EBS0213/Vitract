@@ -104,8 +104,11 @@ func canonicalVideoURL(_ input: String) throws -> URL {
               matches("^/[A-Za-z0-9_]+/status/[0-9]+(/video/[0-9]+)?/?$") {
         target = "https://x.com" + path
     } else if ["threads.com", "www.threads.com", "threads.net", "www.threads.net"].contains(host),
-              matches("^/@[A-Za-z0-9._]{1,30}/post/[A-Za-z0-9_-]{5,64}/?$") {
-        target = "https://www.threads.com" + path
+              matches("^/@[A-Za-z0-9._]{1,30}/post/[A-Za-z0-9_-]{5,64}(/media)?/?$") {
+        target = "https://www.threads.com" + path.replacingOccurrences(of: "/media/?$", with: "", options: .regularExpression)
+        if let index = c.queryItems?.first(where: { $0.name == "vitract_video" })?.value, let n = Int(index), n > 0, n <= 100 {
+            target! += "?vitract_video=\(n)"
+        }
     } else if ["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"].contains(host) {
         if matches("^/(reel/[0-9]+|[A-Za-z0-9.]+/videos/[0-9]+)/?$") { target = "https://www.facebook.com" + path }
         else if path == "/watch" || path == "/watch/", let v = c.queryItems?.first(where: { $0.name == "v" })?.value,
@@ -345,6 +348,8 @@ final class DownloadModel: ObservableObject {
     @Published var selectedHeight = 1080
     @Published var captions: [CaptionTrack] = []
     @Published var selectedCaption = ""
+    @Published var postVideoCount = 1
+    @Published var postVideoIndex = 1
     @Published var outputDirectory: URL
     @Published var stage = "idle"
     @Published var statusText = "영상 링크를 붙여 넣어 주세요"
@@ -364,9 +369,10 @@ final class DownloadModel: ObservableObject {
     init(toolsDirectory: URL? = nil, outputDirectory initialOutputDirectory: URL? = nil) {
         tools = ToolLocations(directoryOverride: toolsDirectory)
         let defaults = UserDefaults.standard
+        let legacyDefaults = UserDefaults(suiteName: "local.clipdock.videosaver")
         if let initialOutputDirectory {
             outputDirectory = initialOutputDirectory
-        } else if let saved = defaults.string(forKey: "outputDirectory") {
+        } else if let saved = defaults.string(forKey: "outputDirectory") ?? legacyDefaults?.string(forKey: "outputDirectory") {
             outputDirectory = URL(fileURLWithPath: saved, isDirectory: true)
         } else {
             outputDirectory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads/영상저장", isDirectory: true)
@@ -439,6 +445,8 @@ final class DownloadModel: ObservableObject {
                 if json["is_live"] as? Bool == true || json["live_status"] as? String == "is_upcoming" {
                     throw DownloadFailure.message("실시간 방송이나 예정된 방송은 저장할 수 없습니다. 방송이 끝난 영상으로 시도해 주세요.")
                 }
+                postVideoCount = json["vitract_video_count"] as? Int ?? 1
+                postVideoIndex = json["vitract_video_index"] as? Int ?? 1
                 captions = captionTracks(json)
                 selectedCaption = captions.first?.id ?? ""
                 let formats = json["formats"] as? [[String: Any]] ?? []
@@ -463,6 +471,13 @@ final class DownloadModel: ObservableObject {
                 activeTool = nil
             } catch { finishFailure(error, id: id) }
         }
+    }
+
+    func selectPostVideo(_ index: Int) {
+        guard !isBusy, let url = inspectedURL, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        parts.queryItems = [URLQueryItem(name: "vitract_video", value: String(index))]
+        urlText = parts.url?.absoluteString ?? urlText
+        inspect()
     }
 
     func download() {
