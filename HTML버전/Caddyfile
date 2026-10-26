@@ -1,0 +1,6 @@
+{$DOMAIN} {
+    encode zstd gzip
+    reverse_proxy videosaver:8766 {
+        header_up X-Forwarded-For {remote_host}
+    }
+}

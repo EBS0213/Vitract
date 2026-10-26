@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!requirements.txt
+!requirements-runtime.txt
+!server.py
+!engine.py
+!healthcheck.py
+!index.html
+!styles.css
+!app.js

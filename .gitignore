@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.*
+!.env.example
+.venv/
+build/
+data/
+dist/
+*.app/
+*.log
+last_result.json
+macOS버전/Tools/yt-dlp
+tests/results/
+Tests/results/

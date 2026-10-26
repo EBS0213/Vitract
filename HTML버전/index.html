@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f5f7f2">
+  <meta name="description" content="Video to MP4.">
+  <title>Vitract — Video to MP4</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='14' fill='%23de1a24'/%3E%3Cpath d='m19 14 15 10-15 10z' fill='white' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="m9 15 6-6M9 7l1-1a4.24 4.24 0 0 1 6 6l-1 1m-6-2-1 1a4.24 4.24 0 0 0 6 6l1-1"/></symbol>
+    <symbol id="i-paste" viewBox="0 0 24 24"><path d="M9 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3M9 3h7v5H9zM14 12h7m-3-3 3 3-3 3"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path d="M11 4 6 8H3v8h3l5 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
+    <symbol id="i-quality" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-7 0v6"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H5a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8zM14 2v6h6M12 11v7m-3-3 3 3 3-3"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 10a8 8 0 0 0-13.5-4L4 8m0-4v4h4M4 14a8 8 0 0 0 13.5 4L20 16m0 4v-4h-4"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  </svg>
+
+  <div class="page-layout">
+    <aside class="ad-placement ad-placement-start" aria-label="Ad" data-ad-placement="left">
+      <span class="ad-label">Ad</span>
+      <div class="ad-placeholder" id="ad-slot-left"></div>
+    </aside>
+
+    <main class="main-content" id="main-content" tabindex="-1">
+      <header class="site-header">
+        <a class="brand" href="./" aria-label="Vitract home"><span class="brand-mark"><svg class="icon"><use href="#i-play"/></svg></span><span>Vitract</span></a>
+      </header>
+
+      <section class="hero" aria-labelledby="page-heading">
+        <h1 id="page-heading">Video to MP4.</h1>
+        <div class="hero-art" aria-hidden="true"><span class="art-orbit"></span><span class="art-dot"></span><svg viewBox="0 0 100 116"><path d="M23 8h39l19 20v69a9 9 0 0 1-9 9H23a9 9 0 0 1-9-9V17a9 9 0 0 1 9-9Z"/><path d="M61 9v22h20M48 43v37m-14-14 14 14 14-14"/></svg></div>
+      </section>
+
+      <section class="notice" id="connection-notice" aria-live="polite" hidden>
+        <svg class="icon"><use href="#i-info"/></svg><div><h2 id="notice-title"></h2><p id="notice-description"></p><div class="notice-actions"><button class="text-button" id="reconnect-button" type="button">Reconnect</button><a class="text-button" id="local-app-link" href="http://127.0.0.1:8766" hidden>Open localhost <span aria-hidden="true">↗</span></a></div></div>
+      </section>
+
+      <section class="card link-card" aria-labelledby="link-heading">
+        <div class="platform-picker" role="group" aria-label="Platform">
+          <button class="platform-button" id="platform-instagram" type="button" data-platform="instagram" aria-pressed="false">Instagram</button>
+          <button class="platform-button" id="platform-threads" type="button" data-platform="threads" aria-pressed="false">Threads</button>
+          <button class="platform-button" id="platform-x" type="button" data-platform="x" aria-pressed="false">X</button>
+          <button class="platform-button" id="platform-facebook" type="button" data-platform="facebook" aria-pressed="false">Facebook</button>
+          <button class="platform-button" id="platform-youtube" type="button" data-platform="youtube" aria-pressed="true">YouTube</button>
+        </div>
+        <div class="section-heading"><h2 id="link-heading">Video URL</h2></div>
+        <form id="inspect-form" novalidate>
+          <div class="input-row"><div class="link-field"><svg class="icon"><use href="#i-link"/></svg><label class="sr-only" for="video-url">Video URL</label><input id="video-url" name="url" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false" aria-describedby="inspect-error" required><button class="paste-button" id="paste-button" type="button" title="Paste URL" aria-label="Paste URL"><svg class="icon"><use href="#i-paste"/></svg></button></div><button class="button button-primary" id="inspect-button" type="submit" disabled><span id="inspect-button-text">Inspect</span><svg class="icon button-icon"><use href="#i-arrow"/></svg><span class="spinner" aria-hidden="true"></span></button></div>
+          <p class="field-error" id="inspect-error" role="alert" hidden></p>
+          <p class="platform-status" id="platform-status" role="status" hidden></p>
+        </form>
+      </section>
+
+      <section class="empty-card" id="video-empty" aria-labelledby="empty-title">
+        <div class="empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-video"/></svg></div>
+        <h2 id="empty-title">Add a video.</h2>
+      </section>
+
+      <section class="card video-card" id="video-card" aria-labelledby="video-title" hidden>
+        <div class="video-preview"><div class="video-thumbnail"><img id="thumbnail-image" alt="" referrerpolicy="no-referrer" hidden><div class="thumbnail-fallback" id="thumbnail-fallback"><svg class="icon"><use href="#i-video"/></svg><span>No preview</span></div><span class="duration-badge" id="video-duration"></span></div><div class="video-caption"><h2 id="video-title"></h2><button class="text-button title-toggle" id="title-toggle" type="button" aria-expanded="false" hidden>More</button><p class="video-channel" id="video-channel"></p></div></div>
+        <div class="download-options"><div class="quality-control"><label for="quality-select">Quality</label><select id="quality-select" disabled></select></div><button class="button button-primary download-button" id="save-button" type="button" disabled><svg class="icon button-icon"><use href="#i-download"/></svg><span id="save-button-text">Download</span><span class="spinner" aria-hidden="true"></span></button></div>
+        <p class="field-error" id="start-error" role="alert" hidden></p>
+      </section>
+
+      <section class="job-panel" id="job-panel" aria-labelledby="job-heading" hidden>
+        <div class="job-heading-row"><span class="job-icon"><svg class="icon"><use id="job-icon-use" href="#i-download"/></svg></span><div><h2 id="job-heading"></h2></div><span class="job-percent" id="job-percent"></span></div>
+        <div class="job-progress" id="job-progress"><progress id="download-progress" max="100" aria-label="Download progress"></progress><div class="progress-labels"><span id="job-stage"></span></div></div>
+        <p class="job-file" id="job-file" hidden></p><p class="field-error" id="job-error" role="alert" hidden></p><p class="job-network-error" id="job-network-error" role="status" hidden></p>
+        <div class="job-actions"><a class="button button-primary" id="manual-download" hidden><svg class="icon"><use href="#i-download"/></svg>Download</a><button class="button button-secondary" id="retry-button" type="button" hidden><svg class="icon"><use href="#i-refresh"/></svg>Retry</button><button class="button button-secondary" id="cancel-button" type="button" hidden>Cancel</button><button class="button button-secondary" id="check-job-button" type="button" hidden>Reconnect</button><button class="button button-quiet" id="next-button" type="button">Next <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+      </section>
+
+      <footer class="site-footer"><span class="connection-status" id="connection-status" role="status"><span class="status-dot"></span><span id="connection-label">Connecting</span></span></footer>
+    </main>
+
+    <aside class="ad-placement ad-placement-end" aria-label="Ad" data-ad-placement="right"><span class="ad-label">Ad</span><div class="ad-placeholder" id="ad-slot-right"></div></aside>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden><span id="toast-text"></span><button class="icon-button" id="toast-close" type="button" aria-label="Dismiss"><svg class="icon"><use href="#i-close"/></svg></button></div>
+  <div class="sr-only" id="announcer" aria-live="polite" aria-atomic="true"></div>
+  <dialog class="login-dialog" id="login-dialog" aria-labelledby="login-heading"><form id="login-form" novalidate><span class="dialog-icon"><svg class="icon"><use href="#i-lock"/></svg></span><h2 id="login-heading">Password</h2><label for="login-password">Password</label><input id="login-password" type="password" name="password" autocomplete="current-password" required aria-describedby="login-error"><p class="field-error" id="login-error" role="alert" hidden></p><button class="button button-primary" id="login-submit" type="submit"><span>Continue</span><span class="spinner" aria-hidden="true"></span></button><button class="text-button" id="login-close" type="button">Close</button></form></dialog>
+  <noscript><div class="noscript-notice">Enable JavaScript.</div></noscript>
+</body>
+</html>

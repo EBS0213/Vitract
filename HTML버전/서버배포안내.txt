@@ -1,0 +1,156 @@
+clipsave 공개 웹사이트 배포 안내
+
+clipsave는 로그인 없이 링크 하나를 MP4로 내려받는 공개 사이트가 기본입니다.
+개인 영상 보관함이나 작업 기록 화면은 제공하지 않습니다. APP_PASSWORD를 설정하면
+접근 제한이 필요한 운영자를 위한 선택적 비밀번호 모드로 바뀝니다.
+
+이 ZIP에는 코드·화면·설정·안내문만 있습니다. Mac 앱, 외부 실행 도구, 임시 다운로드,
+비밀번호는 포함하지 않습니다. Docker 빌드가 필요한 공개 패키지를 설치합니다.
+이 작업 환경에는 Docker가 없어 이미지 빌드와 컨테이너 실행은 실제 검증하지
+못했습니다. 로컬 HTTP·보안 통합 시험과 실제 영상 다운로드·변환은 별도로 검증했습니다.
+
+Docker로 로컬 확인
+1. Docker Engine/Desktop과 Compose 플러그인을 설치합니다.
+2. .env.example을 .env로 복사합니다.
+3. PUBLIC_MODE=1, APP_PORT=8766, PUBLIC_ORIGIN=http://localhost:8766으로 둡니다.
+   APP_PASSWORD가 비어 있으면 비밀번호 없이 이용합니다.
+4. 다음 명령을 실행합니다.
+     docker compose up -d --build
+     docker compose ps
+     docker compose logs --tail 100 videosaver
+5. http://localhost:8766 으로 접속합니다.
+
+PUBLIC_ORIGIN은 사용자가 여는 정확한 주소입니다. localhost와 127.0.0.1은 다른
+주소이며 포트를 바꾸면 PUBLIC_ORIGIN의 포트도 바꿔야 합니다. 기본 compose는 호스트
+127.0.0.1 포트에만 노출하므로 인터넷 공개에는 아래 HTTPS 설정을 사용하세요.
+
+Caddy HTTPS 공개
+1. 실제 도메인을 서버 IP로 연결하고 방화벽에서 80/443 포트를 허용합니다.
+2. .env의 DOMAIN을 실제 도메인으로 바꿉니다. PUBLIC_MODE=1을 유지합니다.
+3. 다음 명령을 실행합니다.
+     docker compose -f compose.yaml -f compose.https.yaml up -d --build
+4. https://본인도메인 으로 접속합니다. 추가 compose가 PUBLIC_ORIGIN을
+   https://DOMAIN으로 지정하며 Caddy가 인증서를 발급·갱신합니다.
+
+Caddy는 전용 네트워크 172.30.86.0/24의 .2, 앱은 .3 주소를 사용합니다.
+앱의 VIDEO_TRUSTED_PROXIES=172.30.86.2/32로 이 프록시만 신뢰합니다. Caddy는
+X-Forwarded-For를 실제 연결 상대 주소 하나로 덮어써 클라이언트가 보낸 위조 값을
+제거합니다. 앱은 신뢰된 프록시가 보낸 단일 IP만 사용하고 그 외 전달 헤더는
+거부합니다. 서버의 기존 네트워크와 대역이 겹치면 subnet, 두 ipv4_address,
+VIDEO_TRUSTED_PROXIES를 일치하도록 함께 변경하세요.
+
+다른 프록시를 사용할 때는 실제 프록시 IP/CIDR만 VIDEO_TRUSTED_PROXIES에 넣고
+X-Forwarded-For를 원래 연결 IP 하나로 덮어쓰도록 설정하세요. 임의 클라이언트가
+이 프록시 IP로 직접 접속할 수 없도록 네트워크를 구성하세요. 신뢰 설정을 비워 두면
+직접 연결 peer IP를 기준으로 제한합니다. 다수 방문자가 같은 프록시 peer를 공유하면
+제한도 공유하게 됩니다. 0.0.0.0/0 같은 전체 신뢰 설정은 사용하지 마세요.
+CDN이나 여러 단계의 프록시는 별도의 신뢰 체인 설계 없이 붙이지 마세요.
+
+보호 장치
+모든 POST에는 같은 Origin과 CSRF 토큰이 필요합니다. Host도 PUBLIC_ORIGIN과
+일치해야 합니다. HTTPS 세션 쿠키는 Secure/HttpOnly/SameSite=Strict이며 Max-Age
+없는 브라우저 세션 쿠키입니다. 서버 세션은 기본 2시간 만료됩니다. 공개 모드의
+GET /api/jobs 목록은 404이며 개별 작업과 파일만 해당 세션에 허용합니다.
+쿠키·비밀번호·공개 주소가 바뀌면 이전 임시 파일 접근이 끊길 수 있습니다.
+
+공개 모드 IP별 분당 기본 한도
+  VIDEO_SESSION_RATE_PER_MINUTE 60 (새 세션 발급)
+  VIDEO_INSPECT_RATE_PER_MINUTE 10 (영상 확인 요청)
+  VIDEO_JOB_RATE_PER_MINUTE     5  (저장 요청)
+요청 제한은 원본 IP 대신 비밀키로 만든 해시를 프로세스 메모리에 보관합니다.
+DB에 IP를 저장하지 않습니다. 큐 전체 한도도 별도로 적용합니다. 메모리 제한 상태는
+재시작 시 초기화됩니다. 대규모 공개 운영에는 프록시 계층의 추가 속도 제한과
+트래픽·스토리지 감시가 필요합니다. 공개 모드에서는 원문 도구 오류 로그를 남기지
+않으며 임시 DB의 영상 URL은 처리용으로만 존재하고 작업 만료 때 함께 삭제됩니다.
+
+선택적 비밀번호
+.env의 APP_PASSWORD에 전용 비밀번호를 설정하면 로그인 뒤 이용합니다.
+PUBLIC_MODE=1이어도 비밀번호가 있으면 로그인해야 합니다. 공개 모드를 끄고 외부에
+접속시키려면 APP_PASSWORD와 PUBLIC_ORIGIN을 모두 지정해야 합니다.
+비밀번호의 특수문자는 Compose .env 인용 규칙에 맞게 감싸고 .env를 공유하지 마세요.
+
+Docker 없이 실행
+  python3 -m venv .venv
+  .venv/bin/python -m pip install -r requirements.txt
+FFmpeg, FFprobe, Node.js도 설치한 다음 환경변수 PUBLIC_MODE=1 및
+PUBLIC_ORIGIN=https://실제도메인 을 설정하고 실행합니다.
+  .venv/bin/python server.py --host 0.0.0.0 --port 8766
+직접 ASGI로 실행한다면 다음 옵션을 모두 사용하세요.
+  uvicorn server:app --host 0.0.0.0 --port 8766 --workers 1 --no-proxy-headers --no-access-log
+Uvicorn이 먼저 전달 헤더를 해석하지 않도록 --no-proxy-headers가 필요합니다.
+CLI server.py와 Docker 기본 명령에는 이 보호 설정이 이미 적용됩니다.
+반드시 worker 1개·인스턴스 1개로 실행합니다. 같은 데이터 폴더를 사용하는 다른
+프로세스는 잠금으로 거부합니다. 여러 인스턴스로 수평 확장하도록 설계하지 않았습니다.
+
+도구 탐색
+  VIDEO_YTDLP / VIDEO_FFMPEG / VIDEO_FFPROBE / VIDEO_NODE 명시 경로
+  현재 프로젝트 build/영상저장.app/Contents/Resources/tools
+  함께 배치한 macOS버전/build/영상저장.app/Contents/Resources/tools
+  시스템 PATH
+잘못 지정한 도구는 조용히 대체하지 않고 누락으로 표시합니다. Mac용 실행 파일은
+Linux에서 사용할 수 없습니다. 실행기는 APP_PASSWORD 등의 서버 비밀을 다운로드
+프로세스 환경에 전달하거나 브라우저 로그인·쿠키를 가져오지 않습니다.
+
+작업 제한과 보관
+  VIDEO_DATA_DIR                 기본 ./data, Docker /data
+  VIDEO_MAX_DURATION_SECONDS     10800 (영상 3시간)
+  VIDEO_MAX_FILE_BYTES           2147483648 (입력/출력 각각 2GiB)
+  VIDEO_MAX_STORAGE_BYTES        8589934592 (전체 작업 파일 8GiB)
+  VIDEO_MIN_FREE_BYTES           536870912 (최소 여유 512MiB)
+  VIDEO_JOB_TIMEOUT_SECONDS      3600 (실행 1시간)
+  VIDEO_METADATA_TIMEOUT_SECONDS 90 (영상 정보 요청)
+  VIDEO_TTL_SECONDS              3600 (완료·취소·실패 후 1시간)
+  VIDEO_SESSION_TTL_SECONDS      7200 (서버 세션 2시간)
+  VIDEO_MAX_ACTIVE_JOBS          8 (전체 실행·대기)
+  VIDEO_MAX_OWNER_JOBS           2 (세션별 실행·대기)
+
+동시에 처리하는 작업은 2개, 영상 확인 토큰은 30분간 유효합니다. 변환 중 입력과
+출력이 함께 존재해 작업 임시 공간이 파일 상한의 두 배와 작은 여유 공간까지 필요할
+수 있습니다. 전체 저장 제한도 검사합니다. 주기적 검사 사이의 순간 증가를 고려해
+충분한 공간을 준비하세요. Compose environment에 VIDEO_* 값을 추가해 조절합니다.
+
+완료 후 브라우저 다운로드를 한 번 시도하지만 브라우저가 막으면 수동 링크를 씁니다.
+같은 세션은 파일 만료 전 재다운로드할 수 있습니다. 일회용 소비 토큰은 아닙니다.
+새로고침 후 과거 작업을 복구하는 UI는 없습니다. 완료 후 1시간이 지난 접근은 즉시
+차단하고 파일·기록을 정리합니다. active 작업은 만료 정리에서 제외됩니다.
+서버 재시작 시 진행 중 작업은 실패로 바뀝니다. 취소 시 프로세스 그룹과 임시 파일을
+정리합니다. 서버에서 받은 파일은 방문자의 브라우저 다운로드 위치에 따로 남습니다.
+
+  docker compose down
+은 서버만 중지하고 임시 data volume은 보존합니다.
+  docker compose down -v
+는 임시 영상·세션·작업 데이터와 관련 volume을 삭제합니다. 필요한 파일을 먼저
+내려받으세요. HTTPS 구성이라면 중지 명령에도 같은 두 -f 옵션을 사용합니다.
+
+플랫폼과 환경 차이
+YouTube 개별 영상/Shorts, Instagram 단일 동영상/Reels, Threads 공개 단일 동영상,
+X 단일 동영상 게시물, Facebook 동영상/Reels의 원본 URL을 지원합니다.
+Instagram/X/Facebook/YouTube는 지정한 yt-dlp 추출기만 사용합니다.
+Threads는 별도 threads_adapter.py가 공개 임베드의 단일 MP4를 확인합니다.
+Threads 로그인이 필요한 페이지나 여러 영상이 있는 게시물은 처리하지 않습니다.
+공유용 단축 URL, 프로필, 피드, 사진, 캐러셀, 비공개·권한 영상, 실시간·예정 방송,
+재생목록 전체는 대상이 아닙니다. X 여러 영상 게시물은 특정 /video/N 링크를
+사용하며, 해당 링크가 명확하게 단일 영상으로 확인되는 경우만 처리합니다.
+
+POST /api/inspect에는 platform (youtube/instagram/threads/x/facebook)과 url을
+보냅니다. 생략된 platform은 이전 클라이언트 호환용으로 youtube입니다.
+GET /api/session의 platforms 목록으로 서버 지원 상태를 확인할 수 있습니다.
+선택한 플랫폼과 URL이 일치해야 하며 지정한 호스트·경로·미디어 CDN만 허용합니다.
+다운로드 전에 영상을 재확인하며 검사한 단일 영상의 메타데이터로만 처리합니다.
+서버 data DB는 기존 작업을 YouTube로 분류하는 platform/media_id 컬럼을 자동 추가합니다.
+
+IP/지역/계정·봇 확인이나 사이트 변경 때문에 Mac과 클라우드에서 결과가 다를 수
+있습니다. 공개 영상도 로그인 또는 요청 제한으로 실패할 수 있습니다. 브라우저
+쿠키를 가져오거나 계정에 로그인하지 않습니다. 플랫폼 제한을 우회하지 않습니다.
+도구 업데이트 후 합성 시험과 실제 영상 시험을 다시 수행하세요.
+저장 권한이 있는 영상에 사용하세요.
+
+광고
+좌우 AdSense 자리는 정적 placeholder뿐입니다. 계정·광고 ID와 외부 광고 스크립트는
+없습니다. 실제 연결 시 광고영역안내.txt를 따르고 필요한 CSP 허용 출처도 별도로
+검토해야 합니다. 현재 CSP는 외부 광고 스크립트를 허용하지 않습니다.
+
+배포 ZIP
+  python3 package_release.py
+허용 파일만 dist/clipsave_웹배포.zip에 넣습니다. 기존 ZIP 교체는 --replace입니다.
+.env, data, .venv, DB·비밀키·영상·로그, 테스트 산출물, 외부 도구를 넣지 않습니다.
