@@ -74,6 +74,27 @@ final class BackendSuite {
     }
 
     func run() async {
+        await test("SNS post URLs accepted and unsafe URLs rejected") {
+            for url in ["https://www.instagram.com/reel/ABCdef123/?igsh=tracking", "https://x.com/test/status/123456789?s=20", "https://www.threads.net/@test/post/ABCdef123", "https://www.facebook.com/reel/123456789"] {
+                _ = try canonicalVideoURL(url)
+            }
+            for url in ["https://instagram.com.evil.test/reel/ABCdef123/", "https://x.com/test", "https://threads.com/@test", "https://user:pass@instagram.com/reel/ABCdef123/"] {
+                do { _ = try canonicalVideoURL(url); throw TestFailure.failed("Accepted invalid SNS URL") }
+                catch is DownloadFailure { }
+            }
+        }
+        await test("SNS inspection and MP4 publication use the accepted link") {
+            try mode("normal")
+            for (i, url) in ["https://www.instagram.com/reel/ABCdef123/", "https://x.com/test/status/123456789", "https://www.threads.com/@test/post/ABCdef123"].enumerated() {
+                let m = model("sns-\(i)")
+                m.urlText = url
+                m.inspect()
+                try await wait("SNS inspect") { !m.isBusy }
+                try expect(m.canDownload, "SNS inspection blocked: \(m.errorText ?? "")")
+                _ = try await save(m)
+            }
+        }
+
         await test("caption TXT extraction and collision-safe repeated save") {
             try mode("normal")
             let m = model("captions")
@@ -160,7 +181,7 @@ final class BackendSuite {
             let calls = try String(contentsOf: tools.appendingPathComponent("calls.jsonl"), encoding: .utf8)
                 .split(separator: "\n").map { try JSONSerialization.jsonObject(with: Data($0.utf8)) as! [String] }
             guard let downloadCall = calls.last(where: { $0.contains("-f") }) else { throw TestFailure.failed("Missing download invocation") }
-            try expect(downloadCall.contains("bv*[height<=180]+ba/b[height<=180]"), "Selected height not honored by yt-dlp selector")
+            try expect(downloadCall.contains("bv*[height<=?180]+ba/b[height<=?180]"), "Selected height not honored by yt-dlp selector")
             try expect(downloadCall.contains("--no-playlist") && downloadCall.contains("--ignore-config"), "Single-video safety flags missing")
             try expect(downloadCall.last == "https://www.youtube.com/watch?v=BaW_jenozKc", "Tracking/playlist parameters passed to tool")
             print("  validated codecs=h264,aac duration=\(duration)s bytes=\(firstBytes.count)")

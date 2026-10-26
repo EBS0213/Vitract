@@ -42,7 +42,7 @@ struct MainView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("링크 하나로, 내 Mac에.")
                             .font(.system(size: 12, weight: .semibold)).tracking(1.1).foregroundStyle(accent)
-                        Text("유튜브 영상을\n영상과 스크립트로 저장하세요.")
+                        Text("영상은 파일로,\n이야기는 스크립트로.")
                             .font(.system(size: 34, weight: .bold)).tracking(-1.1).lineSpacing(3).foregroundStyle(ink)
                         Text("영상 주소를 넣고, 화질을 고르면 준비 끝.")
                             .font(.system(size: 14)).foregroundStyle(muted)
@@ -112,7 +112,7 @@ struct MainView: View {
                 step("01")
                 Text("영상 링크").font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Text("일반 영상 · Shorts").font(.system(size: 11)).foregroundStyle(muted)
+                Text("YouTube · Instagram · Threads · X · Facebook").font(.system(size: 11)).foregroundStyle(muted)
             }
             HStack(spacing: 10) {
                 HStack(spacing: 9) {
@@ -120,7 +120,7 @@ struct MainView: View {
                     TextField("https://www.youtube.com/watch?v=…", text: $model.urlText)
                         .textFieldStyle(.plain).font(.system(size: 13))
                         .focused($linkFocused).onSubmit { if !model.isBusy { model.inspect() } }
-                        .accessibilityLabel("유튜브 영상 주소")
+                        .accessibilityLabel("영상 게시물 주소")
                         .disabled(model.isBusy)
                     Button { model.pasteLink() } label: { Image(systemName: "doc.on.clipboard") }
                         .buttonStyle(.plain).foregroundStyle(accent).help("클립보드에서 붙여넣기")
@@ -207,7 +207,7 @@ struct MainView: View {
             }
             VStack(spacing: 7) {
                 Text("저장할 영상이 여기에 표시됩니다").font(.system(size: 14, weight: .semibold)).foregroundStyle(ink)
-                Text("위에 유튜브 링크를 붙여넣고 ‘영상 확인’을 눌러주세요.")
+                Text("위에 영상 링크를 붙여넣고 ‘영상 확인’을 눌러주세요.")
                     .font(.system(size: 12)).foregroundStyle(muted)
             }
             HStack(spacing: 25) {
@@ -266,7 +266,7 @@ struct MainView: View {
         return total >= 3600 ? String(format: "%d:%02d:%02d", total / 3600, (total / 60) % 60, total % 60) : String(format: "%d:%02d", total / 60, total % 60)
     }
     private func qualityLabel(_ height: Int) -> String {
-        switch height { case 2160: return "2160p · 4K"; case 1440: return "1440p · QHD"; case 1080: return "1080p · Full HD"; case 720: return "720p · HD"; default: return "\(height)p" }
+        switch height { case 0: return "원본 화질"; case 2160: return "2160p · 4K"; case 1440: return "1440p · QHD"; case 1080: return "1080p · Full HD"; case 720: return "720p · HD"; default: return "\(height)p" }
     }
 }
 

@@ -85,6 +85,38 @@ func canonicalYouTubeURL(_ input: String) throws -> URL {
     return url
 }
 
+/// Accept only direct posts from supported platforms; strip tracking parameters.
+func canonicalVideoURL(_ input: String) throws -> URL {
+    if let youtube = try? canonicalYouTubeURL(input) { return youtube }
+    var value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !value.contains("://") { value = "https://" + value }
+    guard let c = URLComponents(string: value), ["http", "https"].contains(c.scheme ?? ""),
+          c.user == nil, c.password == nil, c.port == nil || c.port == 443,
+          let host = c.host?.lowercased(), !c.percentEncodedPath.contains("%"), !c.path.contains("\\") else {
+        throw DownloadFailure.message("올바른 영상 게시물 링크를 입력해 주세요.")
+    }
+    let path = c.path
+    func matches(_ pattern: String) -> Bool { path.range(of: pattern, options: .regularExpression) != nil }
+    var target: String?
+    if ["instagram.com", "www.instagram.com"].contains(host), matches("^/(p|reel|reels|tv)/[A-Za-z0-9_-]{5,64}/?$") {
+        target = "https://www.instagram.com" + path
+    } else if ["x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"].contains(host),
+              matches("^/[A-Za-z0-9_]+/status/[0-9]+(/video/[0-9]+)?/?$") {
+        target = "https://x.com" + path
+    } else if ["threads.com", "www.threads.com", "threads.net", "www.threads.net"].contains(host),
+              matches("^/@[A-Za-z0-9._]{1,30}/post/[A-Za-z0-9_-]{5,64}/?$") {
+        target = "https://www.threads.com" + path
+    } else if ["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"].contains(host) {
+        if matches("^/(reel/[0-9]+|[A-Za-z0-9.]+/videos/[0-9]+)/?$") { target = "https://www.facebook.com" + path }
+        else if path == "/watch" || path == "/watch/", let v = c.queryItems?.first(where: { $0.name == "v" })?.value,
+                v.range(of: "^[0-9]+$", options: .regularExpression) != nil { target = "https://www.facebook.com/watch/?v=" + v }
+    }
+    guard let target, let url = URL(string: target) else {
+        throw DownloadFailure.message("YouTube · Instagram · Threads · X · Facebook의 개별 영상 게시물 링크를 넣어 주세요. 프로필·목록·단축 공유 링크는 지원하지 않습니다.")
+    }
+    return url
+}
+
 func safeVideoFilename(_ title: String, videoID: String) -> String {
     let forbidden = CharacterSet(charactersIn: "/\\:<>\"|?*\0").union(.controlCharacters)
     let cleaned = title.unicodeScalars.map { forbidden.contains($0) ? " " : String($0) }.joined()
@@ -315,7 +347,7 @@ final class DownloadModel: ObservableObject {
     @Published var selectedCaption = ""
     @Published var outputDirectory: URL
     @Published var stage = "idle"
-    @Published var statusText = "유튜브 링크를 붙여 넣어 주세요"
+    @Published var statusText = "영상 링크를 붙여 넣어 주세요"
     @Published var progress = 0.0
     @Published var detailText = ""
     @Published var lastOutput: URL?
@@ -349,7 +381,7 @@ final class DownloadModel: ObservableObject {
     var isBusy: Bool { ["inspecting", "downloading", "converting", "transcribing"].contains(stage) }
     var toolsReady: Bool { tools.ready }
     var canDownload: Bool {
-        !isBusy && tools.ready && metadata != nil && inspectedURL != nil && (try? canonicalYouTubeURL(urlText)) == inspectedURL
+        !isBusy && tools.ready && metadata != nil && inspectedURL != nil && (try? canonicalVideoURL(urlText)) == inspectedURL
     }
 
     func pasteLink() {
@@ -387,7 +419,7 @@ final class DownloadModel: ObservableObject {
     func inspect() {
         guard !isBusy, tools.ready, let ytdlp = tools.ytdlp else { return }
         let url: URL
-        do { url = try canonicalYouTubeURL(urlText) }
+        do { url = try canonicalVideoURL(urlText) }
         catch { fail(error); return }
         let id = begin(stage: "inspecting", text: "영상 정보를 확인하고 있어요")
         metadata = nil
@@ -410,13 +442,14 @@ final class DownloadModel: ObservableObject {
                 captions = captionTracks(json)
                 selectedCaption = captions.first?.id ?? ""
                 let formats = json["formats"] as? [[String: Any]] ?? []
-                let heights = Array(Set(formats.compactMap { format -> Int? in
+                var heights = Array(Set(formats.compactMap { format -> Int? in
                     guard let codec = format["vcodec"] as? String, codec != "none", !codec.isEmpty,
                           format["has_drm"] as? Bool != true,
                           let height = format["height"] as? Int, height > 0 else { return nil }
                     return height
                 })).sorted(by: >)
-                guard !heights.isEmpty else { throw DownloadFailure.message("이 영상에서 저장할 수 있는 화질을 찾지 못했습니다.") }
+                if heights.isEmpty, !formats.isEmpty { heights = [0] }
+                guard !heights.isEmpty else { throw DownloadFailure.message("저장할 단일 영상이 없습니다. 여러 영상이 포함된 게시물은 개별 영상 링크를 사용해 주세요.") }
                 metadata = VideoMetadata(title: json["title"] as? String ?? "유튜브 영상",
                                          uploader: json["uploader"] as? String ?? json["channel"] as? String ?? "",
                                          duration: (json["duration"] as? NSNumber)?.doubleValue ?? 0,
@@ -447,7 +480,7 @@ final class DownloadModel: ObservableObject {
             do {
                 try manager.createDirectory(at: directory, withIntermediateDirectories: true)
                 try manager.createDirectory(at: scratch, withIntermediateDirectories: false)
-                let filter = height > 0 ? "bv*[height<=\(height)]+ba/b[height<=\(height)]" : "bv*+ba/b"
+                let filter = height > 0 ? "bv*[height<=?\(height)]+ba/b[height<=?\(height)]" : "bv*+ba/b"
                 let arguments = commonArguments() + [
                     "--no-simulate", "--progress", "--newline", "--progress-delta", "0.3",
                     "--concurrent-fragments", "4", "-f", filter, "-S", "res,vcodec:h264,acodec:aac",
@@ -502,7 +535,7 @@ final class DownloadModel: ObservableObject {
                     throw DownloadFailure.message("완성된 MP4 파일 검증에 실패했습니다. 다시 시도해 주세요.")
                 }
                 try ensureCurrent(id)
-                let videoID = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "v" })?.value ?? "video"
+                let videoID = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "v" })?.value ?? url.lastPathComponent
                 let output = try publishMP4Exclusively(staged: staged, directory: directory, filename: safeVideoFilename(video.title, videoID: videoID))
                 lastOutput = output
                 progress = 1
@@ -541,7 +574,7 @@ final class DownloadModel: ObservableObject {
                 let staged = scratch.appendingPathComponent("script.txt")
                 try text.write(to: staged, atomically: true, encoding: .utf8)
                 try ensureCurrent(id)
-                let videoID = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "v" })?.value ?? "video"
+                let videoID = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "v" })?.value ?? url.lastPathComponent
                 let stem = (safeVideoFilename(video.title, videoID: videoID) as NSString).deletingPathExtension
                 lastOutput = try publishMP4Exclusively(staged: staged, directory: directory, filename: stem + " 스크립트.txt")
                 progress = 1
@@ -581,6 +614,10 @@ final class DownloadModel: ObservableObject {
     private func commonArguments() -> [String] {
         var args = ["--ignore-config", "--no-playlist", "--no-colors", "--no-cache-dir", "--abort-on-error",
                     "--socket-timeout", "25", "--retries", "3", "--fragment-retries", "3"]
+        if let resource = Bundle.main.resourceURL {
+            let plugins = resource.appendingPathComponent("plugins")
+            if FileManager.default.fileExists(atPath: plugins.path) { args += ["--plugin-dirs", plugins.path] }
+        }
         if let ffmpeg = tools.ffmpeg { args += ["--ffmpeg-location", ffmpeg.deletingLastPathComponent().path] }
         if let node = tools.node { args += ["--js-runtimes", "node:\(node.path)"] }
         return args

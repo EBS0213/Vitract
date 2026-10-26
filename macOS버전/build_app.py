@@ -307,10 +307,11 @@ def build_app(minimum):
     run(["/usr/bin/swiftc", "-parse-as-library", "-O", "-target", "arm64-apple-macosx14.0",
          "-module-cache-path", BUILD / "ModuleCache", "-framework", "SwiftUI", "-framework", "AppKit",
          *sources, "-o", EXECUTABLE], capture=False)
+    shutil.copytree(ROOT / "Plugins", RESOURCES / "plugins", dirs_exist_ok=True)
     build_icon()
     plist = {"CFBundleExecutable": "VideoSaver", "CFBundleIdentifier": "local.clipdock.videosaver",
         "CFBundleName": "Vitract", "CFBundleDisplayName": "Vitract", "CFBundlePackageType": "APPL",
-        "CFBundleShortVersionString": "1.1.0", "CFBundleVersion": "2",
+        "CFBundleShortVersionString": "1.2.0", "CFBundleVersion": "3",
         "CFBundleIconFile": "AppIcon", "LSMinimumSystemVersion": minimum,
         "LSApplicationCategoryType": "public.app-category.video", "NSHighResolutionCapable": True,
         "NSPrincipalClass": "NSApplication", "NSHumanReadableCopyright": "© 2026 Vitract. Third-party notices included."}
