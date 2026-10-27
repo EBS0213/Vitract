@@ -721,7 +721,11 @@ final class DownloadModel: ObservableObject {
             if !detail.isEmpty { logText = String((logText + "\n" + detail).suffix(40_000)) }
             let lower = detail.lowercased()
             let message: String
-            if lower.contains("sign in") || lower.contains("private video") || lower.contains("members-only") || lower.contains("age-restricted") {
+            if lower.contains("no public video found in threads embed") {
+                message = "Threads 공개 응답에서 영상을 찾지 못했습니다. 게시물에 직접 첨부된 영상인지 확인해 주세요."
+            } else if lower.contains("threads shared post has no public video") {
+                message = "Threads에 연결된 원본 게시물에서 다운로드 가능한 영상을 찾지 못했습니다."
+            } else if lower.contains("sign in") || lower.contains("private video") || lower.contains("members-only") || lower.contains("age-restricted") {
                 message = "이 영상은 로그인이나 별도 접근 권한이 필요합니다. 공개된 다른 영상으로 시도해 주세요."
             } else if lower.contains("unavailable") || lower.contains("not available") || lower.contains("removed") {
                 message = "현재 저장할 수 없는 영상입니다. 삭제 또는 공개 상태를 확인해 주세요."

@@ -1,6 +1,7 @@
 """Strict, anonymous extraction of one video from an official Threads embed.
 
-No browser, cookies, login, third-party service, generic extractor, or redirects.
+No browser, cookies, login, third-party service, or generic extractor.
+Verified Instagram attachment cards can be resolved by the Instagram extractor.
 The returned info dict can be passed to yt-dlp --load-info-json. Re-extract before
 use: CDN URLs expire. Duration/dimensions require downstream ffprobe validation.
 """
@@ -57,6 +58,40 @@ def _cdn_url(value, *, video=False):
         raise ThreadsError('Unsupported Threads media URL.', 'threads_invalid_media') from None
     return value
 
+def instagram_attachment_url(value):
+    """Accept only explicit Instagram post cards, never arbitrary redirects."""
+    try:
+        p = urlsplit(value)
+        if p.scheme != 'https' or p.username or p.password or p.port not in (None, 443):
+            return None
+        if p.hostname == 'l.facebook.com' and p.path == '/l.php':
+            value = parse_qs(p.query).get('u', [''])[0]
+            p = urlsplit(value)
+        if (p.scheme != 'https' or p.hostname not in ('instagram.com', 'www.instagram.com')
+                or p.username or p.password or p.port not in (None, 443)
+                or '\\' in value or any(ord(c) <= 32 for c in value)):
+            return None
+        match = re.fullmatch(r'/(p|reel|reels)/([A-Za-z0-9_-]{5,64})/?', p.path)
+        if match:
+            return f'https://www.instagram.com/{match[1]}/{match[2]}/'
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def select_shared_video(result, index):
+    entries = result.get('entries', []) if result.get('_type') == 'playlist' else [result]
+    videos = [entry for entry in entries if isinstance(entry, dict) and any(
+        f.get('url') and f.get('vcodec') != 'none' for f in entry.get('formats', []))]
+    if not videos:
+        raise ThreadsError('Threads shared post has no public video.', 'threads_shared_no_video')
+    if not 1 <= index <= len(videos):
+        raise ThreadsError('Selected video is unavailable.', 'threads_invalid_selection')
+    info = dict(videos[index - 1])
+    info['vitract_video_count'] = len(videos)
+    info['vitract_video_index'] = index
+    return info
+
 class _EmbedParser(HTMLParser):
     VOID = {'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'}
     def __init__(self):
@@ -65,6 +100,7 @@ class _EmbedParser(HTMLParser):
         self.video_count = 0
         self.sources = []
         self.post_links = []
+        self.attachments = []
         self.caption = []
         self.poster = None
         self.carousel = False
@@ -80,6 +116,9 @@ class _EmbedParser(HTMLParser):
         if tag == 'source' and any(item[0] == 'video' for item in self.stack) and a.get('src'):
             self.sources.append(a['src'])
         if tag == 'a' and a.get('href'):
+            if any('LinkAttachmentOuterContainer' in classes for _, classes in self.stack):
+                attachment = instagram_attachment_url(a['href'])
+                if attachment: self.attachments.append(attachment)
             try:
                 _, user, code = canonical_threads_url(a['href'])
                 self.post_links.append((user.casefold(), code))
@@ -107,7 +146,11 @@ def parse_threads_embed(embed_html, target_url, video_index=1):
     if (user.casefold(), code) not in parser.post_links:
         raise ThreadsError('Threads post could not be verified.', 'threads_identity_mismatch')
     if parser.video_count < 1:
-        raise ThreadsError('No public video found.', 'threads_no_video')
+        attachments = list(dict.fromkeys(parser.attachments))
+        if len(attachments) == 1:
+            return {'_type': 'url', 'url': attachments[0], 'ie_key': 'Instagram',
+                    'vitract_video_index': video_index, 'webpage_url': url}
+        raise ThreadsError('No public video found in Threads embed.', 'threads_no_video')
     sources = list(dict.fromkeys(_cdn_url(value, video=True) for value in parser.sources))
     if not sources or not 1 <= video_index <= len(sources):
         raise ThreadsError('Selected video is unavailable.', 'threads_invalid_selection')
@@ -196,6 +239,15 @@ class VitractThreadsIE(InfoExtractor):
     def _real_extract(self, url):
         try:
             info = inspect_threads(url, 30)
+            if info.get('_type') == 'url' and info.get('ie_key') == 'Instagram':
+                self.to_screen('Threads 공유 원본에서 영상을 확인하고 있습니다')
+                # Do not process the playlist: photo entries have no formats and fail
+                # yt-dlp's normal playlist processing. Select a video first.
+                shared = self._downloader.extract_info(info['url'], download=False,
+                                                       ie_key='Instagram', process=False)
+                if not isinstance(shared, dict):
+                    raise ThreadsError('Threads shared post is unavailable.')
+                info = select_shared_video(shared, info['vitract_video_index'])
             info['extractor_key'] = self.ie_key()
             return info
         except ThreadsError as error:
